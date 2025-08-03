@@ -1,7 +1,9 @@
 package com.ecommerce.order_service.service;
 
+import com.ecommerce.order_service.config.WebClientConfig;
 import com.ecommerce.order_service.dto.AddToCartRequest;
-import com.ecommerce.order_service.dto.CartCountResponse;
+import com.ecommerce.order_service.dto.CartItemResponse;
+import com.ecommerce.order_service.dto.ProductResponse;
 import com.ecommerce.order_service.model.CartItem;
 import com.ecommerce.order_service.model.GuestCart;
 import com.ecommerce.order_service.repository.CartItemRepository;
@@ -9,13 +11,11 @@ import com.ecommerce.order_service.repository.GuestCartRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.reactive.function.client.WebClient;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @Transactional
@@ -23,9 +23,8 @@ import java.util.UUID;
 public class CartService {
 
     private final GuestCartRepository guestCartRepository;
-
     private final CartItemRepository cartItemRepository;
-
+    private final WebClient.Builder webClientBuilder;
     private static final int GUEST_CART_EXPIRY_DAYS = 90;
     private static final Double price = 40.34;
 
@@ -43,7 +42,15 @@ public class CartService {
         guestCart.setLastActivityAt(LocalDateTime.now());
         guestCartRepository.save(guestCart);
 
-        // ToDo: Make a call to Product service to fetch price of product in real time.
+        ProductResponse product = webClientBuilder.build().get()
+                .uri("http://localhost:8081/api/product/id",
+                        uriBuilder -> uriBuilder.queryParam("productId", request.getProductId()).build())
+                .retrieve()
+                .bodyToMono(ProductResponse.class)
+                .block();
+
+        if(product == null)
+            throw new RuntimeException("Unable to retrieve info from product service for productId: " + request.getProductId());
 
         // Checking if this same product is already present in Database for this same guest
         Optional<CartItem> existingItem = cartItemRepository.findByGuestCartIdAndProductId(guestCartId, request.getProductId());
@@ -52,9 +59,9 @@ public class CartService {
         if(existingItem.isPresent()){
             cartItem = existingItem.get();
             cartItem.setQuantity(existingItem.get().getQuantity() + 1);
-            cartItem.setPriceAtAddition(price + price);
+            cartItem.setPriceAtAddition(product.getPrice() * cartItem.getQuantity());
         }else {
-            cartItem = new CartItem(guestCartId, request.getProductId(), request.getQuantity(), price);
+            cartItem = new CartItem(guestCartId, request.getProductId(), request.getQuantity(), product.getPrice());
         }
         return cartItemRepository.save(cartItem);
     }
@@ -67,12 +74,87 @@ public class CartService {
         return cartItemRepository.findByGuestCartId(guestCartId).stream().mapToInt(CartItem::getQuantity).sum();
     }
 
-    public void removeCartItem(UUID guestCartId, UUID cartItemId){
+    public double getTotalPrice(UUID guestCartId, String productId) {
+        if(guestCartId != null && !productId.equals("null")){
+            CartItem cartItem = cartItemRepository.findByGuestCartIdAndProductId(guestCartId, productId)
+                    .orElseThrow(() -> new RuntimeException("Couldn't fetch the total price for product: " + productId));
+            return cartItem.getPriceAtAddition();
+        }
+        if(guestCartId != null) {
+            List<CartItem> cartItem = cartItemRepository.findByGuestCartId(guestCartId);
+            return cartItem.stream().mapToDouble(CartItem::getPriceAtAddition).sum();
+        }else
+            throw new RuntimeException("GuestID is not available in the database.");
+    }
 
-        boolean result = cartItemRepository.findByIdAndGuestCartId(cartItemId, guestCartId);
-        if (!result) {
+    public List<CartItemResponse> getCartItems(UUID guestCartId){
+        // Query cartItems DB to fetch cart items for guestCartId
+        // Gather Product info for each product available in the list.
+        return mapCartItemAndProductInfo(cartItemRepository.findByGuestCartId(guestCartId));
+    }
+    public void removeCartItem(UUID guestCartId, String productId, boolean completelyRemoveFlag){
+
+        Optional<CartItem> result = cartItemRepository.findByGuestCartIdAndProductId(guestCartId, productId);
+        if (!result.isPresent()) {
             throw new RuntimeException("Product couldn't be removed, please try again.");
         }
-        cartItemRepository.deleteById(cartItemId);
+
+        ProductResponse product = webClientBuilder.build().get()
+                .uri("http://localhost:8081/api/product/id",
+                        uriBuilder -> uriBuilder.queryParam("productId", productId).build())
+                .retrieve()
+                .bodyToMono(ProductResponse.class)
+                .block();
+
+        if(result.get().getQuantity() == 1 || completelyRemoveFlag){
+            cartItemRepository.deleteById(result.get().getId());
+        }else {
+            result.get().setQuantity(result.get().getQuantity() - 1);
+            result.get().setPriceAtAddition(product.getPrice() * result.get().getQuantity());
+            cartItemRepository.save(result.get());
+        }
+    }
+
+    private List<CartItemResponse> mapCartItemAndProductInfo(List<CartItem> cartItemList){
+        List<CartItemResponse> cartItemResponseList = new ArrayList<>();
+        List<String> productIds = new ArrayList<>();
+
+        cartItemList.stream().forEach(x-> productIds.add(x.getProductId()));
+
+        if(productIds.isEmpty()){
+            throw new RuntimeException("No product found in this cart!");
+        }
+        try {
+            List<ProductResponse> productResponseList = webClientBuilder.build()
+                    .post()
+                    .uri("http://localhost:8081/api/product/byIds")
+                    .bodyValue(productIds)
+                    .retrieve()
+                    .bodyToFlux(ProductResponse.class)
+                    .collectList()
+                    .block();
+
+            for (CartItem cartItem: cartItemList) {
+                Optional<ProductResponse> product = productResponseList.stream().filter(x-> x.getId().equals(cartItem.getProductId())).findFirst();
+
+                if (product.isPresent()){
+                    CartItemResponse cartItemResponse = new CartItemResponse(
+                            product.get().getId(),
+                            product.get().getImageUrl(),
+                            product.get().getName(),
+                            product.get().getPrice(),
+                            cartItem.getQuantity(),
+                            product.get().getQuantity(),
+                            product.get().getPrice() * cartItem.getQuantity()
+                            );
+                    cartItemResponseList.add(cartItemResponse);
+                }else
+                    throw new RuntimeException("Couldn't fetch product from productResponseList object.");
+            }
+        }catch (Exception ex){
+            System.out.println(ex.getMessage());
+            return new ArrayList<>();
+        }
+        return cartItemResponseList;
     }
 }

@@ -2,6 +2,7 @@ package com.ecommerce.order_service.controller;
 
 import com.ecommerce.order_service.dto.AddToCartRequest;
 import com.ecommerce.order_service.dto.CartCountResponse;
+import com.ecommerce.order_service.dto.CartItemResponse;
 import com.ecommerce.order_service.dto.GuestCartIdResponse;
 import com.ecommerce.order_service.model.CartItem;
 import com.ecommerce.order_service.model.GuestCart;
@@ -44,11 +45,13 @@ public class CartController {
     }
 
     // Todo: Method to return product info + cart info to cart.html page
-    /*
     @GetMapping("/items")
-    public ResponseEntity<List<CartItem>> getCartItems(){
+    public ResponseEntity<List<CartItemResponse>> getCartItems(
+            @RequestHeader("X-Guest-Cart-Id") UUID guestCartId
+    ){
+        List<CartItemResponse> cartItemResponsesList = cartService.getCartItems(guestCartId);
+        return new ResponseEntity<>(cartItemResponsesList, HttpStatus.OK);
     }
-    */
 
     @GetMapping("/count")
     public ResponseEntity<CartCountResponse> getCartItemsCount(
@@ -58,12 +61,21 @@ public class CartController {
         return ResponseEntity.ok(new CartCountResponse(count));
     }
 
-    @DeleteMapping("/items/{cartItemId}")
+    @GetMapping("/price")
+    public double getTotalPrice(
+            @RequestHeader("X-Guest-Cart-Id") UUID guestCartId,
+            @RequestParam(required = false, defaultValue = "null") String productId
+    ){
+        return cartService.getTotalPrice(guestCartId, productId);
+    }
+
+    @DeleteMapping("/items")
     public ResponseEntity<Void> removeCartItem(
             @RequestHeader("X-Guest-Cart-Id") UUID guestCartId,
-            @PathVariable UUID cartItemId
+            @RequestParam String productId,
+            @RequestParam String completeRemove
     ){
-        cartService.removeCartItem(guestCartId,cartItemId);
+        cartService.removeCartItem(guestCartId,productId, Boolean.parseBoolean(completeRemove));
         return new ResponseEntity<>(HttpStatus.OK);
     }
 }
