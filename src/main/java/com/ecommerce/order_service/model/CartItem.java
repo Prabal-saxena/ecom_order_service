@@ -3,7 +3,6 @@ package com.ecommerce.order_service.model;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -21,7 +20,7 @@ public class CartItem {
     private UUID id;
 
     @Column(nullable = false)
-    private UUID guestCartId;
+    private UUID cartId;
 
     @Column(nullable = false)
     private String productId;
@@ -39,9 +38,9 @@ public class CartItem {
         this.addedAt = LocalDateTime.now();
     }
 
-    public CartItem(UUID guestCartId, String productId, int quantity, Double priceAtAddition) {
+    public CartItem(UUID cartId, String productId, int quantity, Double priceAtAddition) {
         this();
-        this.guestCartId = guestCartId;
+        this.cartId = cartId;
         this.productId = productId;
         this.quantity = quantity;
         this.priceAtAddition = priceAtAddition;
