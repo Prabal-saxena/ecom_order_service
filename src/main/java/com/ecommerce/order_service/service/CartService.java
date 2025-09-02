@@ -53,7 +53,7 @@ public class CartService {
             throw new RuntimeException("Unable to retrieve info from product service for productId: " + request.getProductId());
 
         // Checking if this same product is already present in Database for this same guest
-        Optional<CartItem> existingItem = cartItemRepository.findByGuestCartIdAndProductId(guestCartId, request.getProductId());
+        Optional<CartItem> existingItem = cartItemRepository.findByCartIdAndProductId(guestCartId, request.getProductId());
 
         CartItem cartItem;
         if(existingItem.isPresent()){
@@ -71,17 +71,17 @@ public class CartService {
             gc.setLastActivityAt(LocalDateTime.now());
             guestCartRepository.save(gc);
         });
-        return cartItemRepository.findByGuestCartId(guestCartId).stream().mapToInt(CartItem::getQuantity).sum();
+        return cartItemRepository.findByCartId(guestCartId).stream().mapToInt(CartItem::getQuantity).sum();
     }
 
     public double getTotalPrice(UUID guestCartId, String productId) {
         if(guestCartId != null && !productId.equals("null")){
-            CartItem cartItem = cartItemRepository.findByGuestCartIdAndProductId(guestCartId, productId)
+            CartItem cartItem = cartItemRepository.findByCartIdAndProductId(guestCartId, productId)
                     .orElseThrow(() -> new RuntimeException("Couldn't fetch the total price for product: " + productId));
             return cartItem.getPriceAtAddition();
         }
         if(guestCartId != null) {
-            List<CartItem> cartItem = cartItemRepository.findByGuestCartId(guestCartId);
+            List<CartItem> cartItem = cartItemRepository.findByCartId(guestCartId);
             return cartItem.stream().mapToDouble(CartItem::getPriceAtAddition).sum();
         }else
             throw new RuntimeException("GuestID is not available in the database.");
@@ -90,11 +90,11 @@ public class CartService {
     public List<CartItemResponse> getCartItems(UUID guestCartId){
         // Query cartItems DB to fetch cart items for guestCartId
         // Gather Product info for each product available in the list.
-        return mapCartItemAndProductInfo(cartItemRepository.findByGuestCartId(guestCartId));
+        return mapCartItemAndProductInfo(cartItemRepository.findByCartId(guestCartId));
     }
     public void removeCartItem(UUID guestCartId, String productId, boolean completelyRemoveFlag){
 
-        Optional<CartItem> result = cartItemRepository.findByGuestCartIdAndProductId(guestCartId, productId);
+        Optional<CartItem> result = cartItemRepository.findByCartIdAndProductId(guestCartId, productId);
         if (!result.isPresent()) {
             throw new RuntimeException("Product couldn't be removed, please try again.");
         }

@@ -1,7 +1,7 @@
 -- Updated cart_items table
 CREATE TABLE order_service.t_cart_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    guest_cart_id UUID NOT NULL, -- New field to identify guest carts
+    cart_id UUID NOT NULL, -- New field to identify guest carts
     product_id VARCHAR(255) NOT NULL,
     quantity INT NOT NULL,
     price_at_addition NUMERIC(10, 2) NOT NULL,
