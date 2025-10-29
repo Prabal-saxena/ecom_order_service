@@ -43,7 +43,7 @@ public class CartService {
         guestCartRepository.save(guestCart);
 
         ProductResponse product = webClientBuilder.build().get()
-                .uri("http://localhost:8081/api/product/id",
+                .uri("http://34.31.139.23/api/product/id",
                         uriBuilder -> uriBuilder.queryParam("productId", request.getProductId()).build())
                 .retrieve()
                 .bodyToMono(ProductResponse.class)
@@ -100,7 +100,7 @@ public class CartService {
         }
 
         ProductResponse product = webClientBuilder.build().get()
-                .uri("http://localhost:8081/api/product/id",
+                .uri("http://34.31.139.23/api/product/id",
                         uriBuilder -> uriBuilder.queryParam("productId", productId).build())
                 .retrieve()
                 .bodyToMono(ProductResponse.class)
@@ -127,7 +127,7 @@ public class CartService {
         try {
             List<ProductResponse> productResponseList = webClientBuilder.build()
                     .post()
-                    .uri("http://localhost:8081/api/product/byIds")
+                    .uri("http://34.31.139.23/api/product/byIds")
                     .bodyValue(productIds)
                     .retrieve()
                     .bodyToFlux(ProductResponse.class)
