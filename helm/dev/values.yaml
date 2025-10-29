@@ -1,0 +1,72 @@
+enabled: true
+deploymentName: "order-service"
+namespace: "app-microservices"
+containerName: "order-service"
+distributed_tracing_enabled: "true"
+log_level: "info"
+log: "stdout"
+app_name: "order-service"
+version: 0.0.1
+env: "dev"
+release: "order-service"
+
+# Service Values
+serviceName: "order-service"
+
+# ServiceAccount
+ksaServiceAccount: order-service-sa
+gcpServiceAccount: order-service-sa@noble-linker-471623-s6.iam.gserviceaccount.com
+cicdKsaServiceAccount: order-service-ci-cd-sa
+cicdGcpServiceAccount: ci-cd-sa@noble-linker-471623-s6.iam.gserviceaccount.com
+
+datasource:
+  username:
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 2
+  targetCPUUtilizationPercentage: 80
+
+# App image details (replaced by helm)
+image:
+  repository: "us-central1-docker.pkg.dev/noble-linker-471623-s6/onlineliquorservicesartifactory/order_service"
+  pullPolicy: IfNotPresent
+  tag: ""
+
+imagePullSecrets:
+  - name: regcred
+
+#Deployment strategy
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 1
+    maxUnavailable: 1
+
+# Replica count for the deployment
+replicaCount: 1
+
+#The Key of node labels
+topologyKey: "topology.kubernetes.io/zone"
+
+service:
+  type: LoadBalancer
+  portName: http
+  port: 80
+  TargetPort: 8082
+  annotations:
+    networking.gke.io/internal-load-balancer-allow-global-access: "true"
+    networking.gkr.io/load-balancer-type: "Internal"
+
+# Resource Limits
+resources:
+  limits:
+    cpu: "1"
+    memory: 512Mi
+  requests:
+    cpu: "500m"
+    memory: 256Mi
+nodeSelector: { }
+tolerations: [ ]
+affinity: { }

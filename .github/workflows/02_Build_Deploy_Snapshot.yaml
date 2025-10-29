@@ -1,0 +1,26 @@
+name: "02 - Build & Deploy Snapshot on GKE"
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [closed]
+permissions:
+  id-token: write
+  contents: write
+
+jobs:
+  build:
+    name: Build Snapshot
+    uses: Prabal-saxena/common-ci-cd-workflows/.github/workflows/build-deploy-snapshot.yaml@main
+    with:
+      APPLICATION_NAME: "order_service"
+      RELEASE: "order-service"
+      IMAGE_TAG: ""
+      ARTIFACTORY_URL: "us-central1-docker.pkg.dev/noble-linker-471623-s6"
+      ARTIFACTORY_NAMESPACE: "onlineliquorservicesartifactory"
+      PROJECT_ID: "noble-linker-471623-s6"
+      GKE_REGION: "us-central1"
+      GKE_CLUSTER: "private-gke-cluster"
+      GKE_NAMESPACE: "app-microservices"
+      POM_VERSION: "0.0.1-SNAPSHOT"
+    secrets: inherit
