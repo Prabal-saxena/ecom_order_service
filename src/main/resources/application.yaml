@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: order_service
+
+  datasource:
+    url: "jdbc:postgresql://127.0.0.1:5433/tols?currentSchema=order_service"
+    username: "postgres"
+    password: "Prabal98@"
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    properties:
+      hibernate:
+        default_schema: "order_service"
+        dialect: "org.hibernate.dialect.PostgreSQLDialect"
+    hibernate:
+      ddl-auto: "update"
+    show-sql: "true"
+    format-sql: "true"
+
+management:
+  endpoint:
+    health:
+      show-details: always
+  endpoints:
+    web:
+      exposure:
+        include: health,info,liveness,readiness
+
+server:
+  port: 8082
