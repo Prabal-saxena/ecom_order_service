@@ -3,9 +3,9 @@ spring:
     name: order_service
 
   datasource:
-    url: "jdbc:postgresql://127.0.0.1:5433/tols?currentSchema=order_service"
+    url: "jdbc:postgresql://localhost:5432/liquorservices?currentSchema=order_service"
     username: "postgres"
-    password: "Prabal98@"
+    password: "admin"
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -29,3 +29,5 @@ management:
 
 server:
   port: 8082
+
+PRODUCT_SERVICE_URL: "http://localhost:8081/api/product"

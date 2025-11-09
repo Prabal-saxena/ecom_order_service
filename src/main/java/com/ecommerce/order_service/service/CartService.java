@@ -9,6 +9,7 @@ import com.ecommerce.order_service.model.GuestCart;
 import com.ecommerce.order_service.repository.CartItemRepository;
 import com.ecommerce.order_service.repository.GuestCartRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -28,6 +29,9 @@ public class CartService {
     private static final int GUEST_CART_EXPIRY_DAYS = 90;
     private static final Double price = 40.34;
 
+    @Value("${PRODUCT_SERVICE_URL}")
+    private String prductServiceUrl;
+
     public GuestCart createGuestCart(){
         UUID newGuestCartId = UUID.randomUUID();
         LocalDateTime expiresAt = LocalDateTime.now().plus(GUEST_CART_EXPIRY_DAYS, ChronoUnit.DAYS);
@@ -43,7 +47,7 @@ public class CartService {
         guestCartRepository.save(guestCart);
 
         ProductResponse product = webClientBuilder.build().get()
-                .uri("http://localhost:8081/api/product/id",
+                .uri(prductServiceUrl + "/id",
                         uriBuilder -> uriBuilder.queryParam("productId", request.getProductId()).build())
                 .retrieve()
                 .bodyToMono(ProductResponse.class)
@@ -100,7 +104,7 @@ public class CartService {
         }
 
         ProductResponse product = webClientBuilder.build().get()
-                .uri("http://localhost:8081/api/product/id",
+                .uri(prductServiceUrl + "/id",
                         uriBuilder -> uriBuilder.queryParam("productId", productId).build())
                 .retrieve()
                 .bodyToMono(ProductResponse.class)
@@ -127,7 +131,7 @@ public class CartService {
         try {
             List<ProductResponse> productResponseList = webClientBuilder.build()
                     .post()
-                    .uri("http://localhost:8081/api/product/byIds")
+                    .uri(prductServiceUrl + "/byIds")
                     .bodyValue(productIds)
                     .retrieve()
                     .bodyToFlux(ProductResponse.class)
