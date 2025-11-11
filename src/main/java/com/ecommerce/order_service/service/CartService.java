@@ -1,13 +1,12 @@
 package com.ecommerce.order_service.service;
 
-import com.ecommerce.order_service.config.WebClientConfig;
 import com.ecommerce.order_service.dto.AddToCartRequest;
 import com.ecommerce.order_service.dto.CartItemResponse;
 import com.ecommerce.order_service.dto.ProductResponse;
 import com.ecommerce.order_service.model.CartItem;
-import com.ecommerce.order_service.model.GuestCart;
+import com.ecommerce.order_service.model.Cart;
 import com.ecommerce.order_service.repository.CartItemRepository;
-import com.ecommerce.order_service.repository.GuestCartRepository;
+import com.ecommerce.order_service.repository.CartRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -23,31 +22,31 @@ import java.util.*;
 @RequiredArgsConstructor
 public class CartService {
 
-    private final GuestCartRepository guestCartRepository;
+    private final CartRepository cartRepository;
     private final CartItemRepository cartItemRepository;
     private final WebClient.Builder webClientBuilder;
-    private static final int GUEST_CART_EXPIRY_DAYS = 90;
-    private static final Double price = 40.34;
+    private static final int GUEST_CART_EXPIRY_DAYS = 30;
 
     @Value("${PRODUCT_SERVICE_URL}")
-    private String prductServiceUrl;
+    private String productServiceUrl;
 
-    public GuestCart createGuestCart(){
+    public Cart createGuestCart(){
+        UUID newCartId = UUID.randomUUID();
         UUID newGuestCartId = UUID.randomUUID();
         LocalDateTime expiresAt = LocalDateTime.now().plus(GUEST_CART_EXPIRY_DAYS, ChronoUnit.DAYS);
-        GuestCart guestCart = new GuestCart(newGuestCartId, expiresAt);
-        return guestCartRepository.save(guestCart);
+        Cart cart = new Cart(newCartId, newGuestCartId, expiresAt);
+        return cartRepository.save(cart);
     }
 
-    public CartItem addProductToCart(UUID guestCartId, AddToCartRequest request){
-        // First, ensure the guest cart exists and update its activity timestamp
-        GuestCart guestCart = guestCartRepository.findById(guestCartId)
-                .orElseThrow(() -> new RuntimeException("Guest cart not found: " + guestCartId));
-        guestCart.setLastActivityAt(LocalDateTime.now());
-        guestCartRepository.save(guestCart);
+    public CartItem addProductToCart(UUID cartId, AddToCartRequest request){
+        // First, ensure the cart exists and update its activity timestamp
+        Cart cart = cartRepository.findById(cartId)
+                .orElseThrow(() -> new RuntimeException("Cart not found: " + cartId));
+        cart.setLastActivityAt(LocalDateTime.now());
+        cartRepository.save(cart);
 
         ProductResponse product = webClientBuilder.build().get()
-                .uri(prductServiceUrl + "/id",
+                .uri(productServiceUrl + "/id",
                         uriBuilder -> uriBuilder.queryParam("productId", request.getProductId()).build())
                 .retrieve()
                 .bodyToMono(ProductResponse.class)
@@ -57,7 +56,7 @@ public class CartService {
             throw new RuntimeException("Unable to retrieve info from product service for productId: " + request.getProductId());
 
         // Checking if this same product is already present in Database for this same guest
-        Optional<CartItem> existingItem = cartItemRepository.findByCartIdAndProductId(guestCartId, request.getProductId());
+        Optional<CartItem> existingItem = cartItemRepository.findByCartIdAndProductId(cartId, request.getProductId());
 
         CartItem cartItem;
         if(existingItem.isPresent()){
@@ -65,36 +64,36 @@ public class CartService {
             cartItem.setQuantity(existingItem.get().getQuantity() + 1);
             cartItem.setPriceAtAddition(product.getPrice() * cartItem.getQuantity());
         }else {
-            cartItem = new CartItem(guestCartId, request.getProductId(), request.getQuantity(), product.getPrice());
+            cartItem = new CartItem(cartId, request.getProductId(), request.getQuantity(), product.getPrice());
         }
         return cartItemRepository.save(cartItem);
     }
 
-    public long getCartItemCount(UUID guestCartId){
-        guestCartRepository.findById(guestCartId).ifPresent(gc-> {
+    public long getCartItemCount(UUID cartId){
+        cartRepository.findById(cartId).ifPresent(gc-> {
             gc.setLastActivityAt(LocalDateTime.now());
-            guestCartRepository.save(gc);
+            cartRepository.save(gc);
         });
-        return cartItemRepository.findByCartId(guestCartId).stream().mapToInt(CartItem::getQuantity).sum();
+        return cartItemRepository.findByCartId(cartId).stream().mapToInt(CartItem::getQuantity).sum();
     }
 
-    public double getTotalPrice(UUID guestCartId, String productId) {
-        if(guestCartId != null && !productId.equals("null")){
-            CartItem cartItem = cartItemRepository.findByCartIdAndProductId(guestCartId, productId)
+    public double getTotalPrice(UUID cartId, String productId) {
+        if(cartId != null && !productId.equals("null")){
+            CartItem cartItem = cartItemRepository.findByCartIdAndProductId(cartId, productId)
                     .orElseThrow(() -> new RuntimeException("Couldn't fetch the total price for product: " + productId));
             return cartItem.getPriceAtAddition();
         }
-        if(guestCartId != null) {
-            List<CartItem> cartItem = cartItemRepository.findByCartId(guestCartId);
+        if(cartId != null) {
+            List<CartItem> cartItem = cartItemRepository.findByCartId(cartId);
             return cartItem.stream().mapToDouble(CartItem::getPriceAtAddition).sum();
         }else
             throw new RuntimeException("GuestID is not available in the database.");
     }
 
-    public List<CartItemResponse> getCartItems(UUID guestCartId){
+    public List<CartItemResponse> getCartItems(UUID cartId){
         // Query cartItems DB to fetch cart items for guestCartId
         // Gather Product info for each product available in the list.
-        return mapCartItemAndProductInfo(cartItemRepository.findByCartId(guestCartId));
+        return mapCartItemAndProductInfo(cartItemRepository.findByCartId(cartId));
     }
     public void removeCartItem(UUID guestCartId, String productId, boolean completelyRemoveFlag){
 
@@ -104,7 +103,7 @@ public class CartService {
         }
 
         ProductResponse product = webClientBuilder.build().get()
-                .uri(prductServiceUrl + "/id",
+                .uri(productServiceUrl + "/id",
                         uriBuilder -> uriBuilder.queryParam("productId", productId).build())
                 .retrieve()
                 .bodyToMono(ProductResponse.class)
@@ -131,7 +130,7 @@ public class CartService {
         try {
             List<ProductResponse> productResponseList = webClientBuilder.build()
                     .post()
-                    .uri(prductServiceUrl + "/byIds")
+                    .uri(productServiceUrl + "/byIds")
                     .bodyValue(productIds)
                     .retrieve()
                     .bodyToFlux(ProductResponse.class)

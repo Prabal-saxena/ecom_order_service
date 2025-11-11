@@ -1,0 +1,6 @@
+CREATE TABLE order_service.t_order_line_items (
+    id BIGSERIAL PRIMARY KEY,
+    sku_code VARCHAR(255),
+    price NUMERIC(19, 2),
+    quantity INTEGER
+);

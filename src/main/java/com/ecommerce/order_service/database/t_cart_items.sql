@@ -1,10 +1,13 @@
 -- Updated cart_items table
 CREATE TABLE order_service.t_cart_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    cart_id UUID NOT NULL, -- New field to identify guest carts
+    cart_id UUID NOT NULL,
     product_id VARCHAR(255) NOT NULL,
-    quantity INT NOT NULL,
-    price_at_addition NUMERIC(10, 2) NOT NULL,
-    added_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (guest_cart_id, product_id) -- A guest cart can only have one entry per product
+    quantity INTEGER NOT NULL,
+    price_at_addition DOUBLE PRECISION NOT NULL,
+    added_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_cart
+        FOREIGN KEY (cart_id)
+        REFERENCES order_service.t_cart_guest (id)
+        ON DELETE CASCADE
 );
